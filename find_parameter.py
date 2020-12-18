@@ -1,0 +1,116 @@
+import requests,os,time,sys
+from time import sleep
+
+class 125HR():
+
+    def __init__(self):
+        self.default_meas()
+        self.url_ftir = 'http://10.10.1.10'
+        self.stat_htm = '/'.join((self.url_ftir,'stat.htm'))
+        self.cmd_htm = '/'.join((self.url_ftir,'cmd.htm'))
+        self.diag_htm = '/'.join((self.url_ftir, 'diag.htm'))
+        self.data_htm = '/'.join((self.url_ftir, 'datafile.htm'))
+        self.init_params = {'WRK':1,
+                            'CNM':'AUTO125HR',
+                            'SRC': 0}
+        html_line = '&'.join(['='.join((x[0].strip(), str(x[1]).strip())) for x in self.init_params.items()])
+        meas_command = '/'.join((self.url_ftir,self.cmd_htm))
+        print('?'.join((self.cmd_htm,html_line)))
+        requests.get('?'.join((self.cmd_htm,html_line)))
+        self.spectrumupdated = False
+        
+    def default_meas(self): 
+        self.meas_params =  {'FLP': 0,
+                            'SNM': 'Find parameters',
+                            'CNM': 'AUTO FTIR Bremen',
+                            'REP': 1,
+                            'APT': 1000,
+                            'NSS': 1,
+                            'RES': 10.0,
+                            'BMS': 1,
+                            'VEL': 20000,
+                            'SRC': 201,
+                            'AQM': 'SD',
+                            'CHN': 1,
+                            'DTC': 16416,
+                            'HPF': 0,
+                            'LPF': 20000,
+                            'OPF': 1,
+                            'PGN': 0,
+                            'DEL': 0,
+                            'WRK': 1,
+                            'PHR': 20.0,
+                            'COR': 0,
+                            'GNS': 1}
+
+    def get_adccount(self):
+        pass
+    def set_pgn(self, pgn):
+        pass
+    def set_apt(self,apt):
+        pass
+    def get_status(self):
+        status={}
+        stat = requests.get(self.stat_htm)
+        # the statues variable
+        i1 = stat.text.rfind('ID=MSTCO')
+        i2 = stat.text.find('<', i1)
+        status['status'] = stat.text[i1 + 9:i2]
+        i1 = stat.text.rfind('ID=SCAN')
+        if i1 > 0:
+            i2 = stat.text.find('<', i1)
+            status['scans'] = int(stat.text[i1 + 8:i2])
+        else:
+            status['scans'] = 0
+        i1 = stat.text.rfind('ID=SRSC')
+        i2 = stat.text.find('<', i1)
+        status['restscans'] = int(stat.text[i1 + 8:i2])
+        #
+        diag = requests.get(self.diag_htm)
+        i1 = diag.text.rfind('ID=DIAG_DTC_STAT')
+        i2 = diag.text.find('>', i1)
+        i3 = diag.text.find('<', i1)
+        status['detector'] = diag.text[i2+1:i3]
+
+        data = requests.get(self.data_htm)
+        i1 = data.text.find('Datafile status')
+        i2 = data.text.find('<TD>', i1)
+        i3 = data.text.find('</TD>', i2)
+        status['datafile'] = data.text[i2+4:i3]
+        return (status)
+
+    def measure(self):
+        html_line = '&'.join(['='.join((x[0].strip(), str(x[1]).strip())) for x in self.meas_params.items()])
+        meas_command = '/'.join((self.url_ftir,self.cmd_htm))
+        print('?'.join((self.cmd_htm,html_line)))
+        requests.get('?'.join((self.cmd_htm,html_line)))
+
+    def get_data(self, filename='none'):
+        status = self.get_status()
+        if status['datafile']=='Ready for download':
+            data = requests.get(self.data_htm)
+            i1 = data.text.find('A HREF=')
+            i2 = data.text.find('">', i1)
+            print('/'.join((self.url_ftir,data.text[i1+9:i2])))
+            data = requests.get('/'.join((self.url_ftir,data.text[i1+9:i2])))
+
+            if filename != 'none':
+                with open(filename, 'wb') as fid:
+                    print (fid)
+                    fid.write(data.content)
+            self.spectrumupdated = True
+        else:
+            self.spectrumupdated = False
+            
+if __name__=='__main__':
+    
+    
+    hr125 = 125HR()
+#    status = v80.get_status()
+    hr125.measure()
+    while hr125.get_status()['status'] != 'IDL':
+        sleep(1)
+        print(v80.get_status()['status'])
+        print(v80.get_status()['datafile'])
+        pass
+    v80.get_data('C:\\Users\\ftir\\Desktop\\nya_emission_project\\vertex80\\test.0')
